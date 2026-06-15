@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Common
+import qs.Services
 import qs.Widgets
 import qs.Modules.Plugins
 
@@ -15,11 +16,17 @@ PluginComponent {
     property bool isRunning: false
     property var schedList: []
     property var _pendingList: []
+    property bool isLoading: false
+
+    readonly property string schedHelper: {
+        var url = Qt.resolvedUrl("./sched-helper.sh")
+        return url.toString().replace("file://", "")
+    }
 
     readonly property var modeNames: ["Auto", "Gaming", "PowerSave", "LowLatency", "Server"]
 
     readonly property var schedDescriptions: ({
-        "scx_beerland": [ "Cache locality", "Prioritizes keeping tasks on the same CPU for cache warmth. Good for cache-heavy workloads, servers, and surprinsingly well in some games." ],
+        "scx_beerland": [ "Cache locality", "Prioritizes keeping tasks on the same CPU for cache warmth. Good for cache-heavy workloads, servers, and surprisingly well in some games." ],
         "scx_bpfland": [ "Interactive vruntime", "L2/L3 cache-aware scheduler for great interactivity under load. Good for gaming, desktop, audio production, power saving, and servers." ],
         "scx_cake": [ "CAKE algorithm gaming", "Experimental 4-tier BPF scheduler adapting network CAKE's DRR++ for CPU. Designed for modern AMD/Intel gaming hardware." ],
         "scx_cosmos": [ "Lightweight general", "Preserves task-to-CPU locality when not saturated. Adapts to both desktop and server workloads with low overhead." ],
@@ -33,14 +40,27 @@ PluginComponent {
         "scx_rusty": [ "Feature-rich tunable", "Highly tunable scheduler with wide feature set. Good for gaming, latency-sensitive workloads, desktop, audio production, and power saving." ]
     })
 
-    readonly property string schedHelper: {
-        var url = Qt.resolvedUrl("./sched-helper.sh")
-        return url.toString().replace("file://", "")
+    function getPollInterval() {
+        var val = PluginService.getGlobalVar("dankSchedPicker", "pollInterval", 3000)
+        return Math.max(1000, Math.min(300000, val))
+    }
+
+    function getListInterval() {
+        var val = PluginService.getGlobalVar("dankSchedPicker", "listInterval", 15000)
+        return Math.max(5000, Math.min(600000, val))
+    }
+
+    function getAnimate() {
+        return PluginService.getGlobalVar("dankSchedPicker", "animate", true)
+    }
+
+    function getAutoRefresh() {
+        return PluginService.getGlobalVar("dankSchedPicker", "autoRefresh", true)
     }
 
     Timer {
         id: pollTimer
-        interval: 3000
+        interval: root.getPollInterval()
         repeat: true
         running: true
         triggeredOnStart: true
@@ -50,14 +70,22 @@ PluginComponent {
         }
     }
 
-    Component.onCompleted: Qt.callLater(root.refreshList)
-
     Timer {
         id: listTimer
-        interval: 15000
+        interval: root.getListInterval()
         repeat: true
-        running: true
+        running: root.getAutoRefresh()
         onTriggered: root.refreshList()
+    }
+
+    function syncTimers() {
+        pollTimer.interval = root.getPollInterval()
+        listTimer.interval = root.getListInterval()
+        listTimer.running = root.getAutoRefresh()
+    }
+
+    Component.onCompleted: {
+        Qt.callLater(root.refreshList)
     }
 
     Process {
@@ -71,6 +99,9 @@ PluginComponent {
                     root.currentMode = parts[1]
                     root.currentModeId = parseInt(parts[2])
                     root.isRunning = root.currentSched !== "none"
+
+                    PluginService.setGlobalVar("dankSchedPicker", "currentSched", root.currentSched)
+                    PluginService.setGlobalVar("dankSchedPicker", "currentMode", root.currentMode)
                 }
             }
         }
@@ -88,83 +119,154 @@ PluginComponent {
         onExited: (code, status) => {
             root.schedList = root._pendingList
             root._pendingList = []
+            root.isLoading = false
+        }
+    }
+
+    Process {
+        id: switchProcess
+        running: false
+        onStarted: {
+            root.isLoading = true
+        }
+        onExited: (code, status) => {
+            root.isLoading = false
+            if (code === 0) {
+                getProcess.command = ["sh", "-c", root.schedHelper + " current"]
+                getProcess.running = true
+                Qt.callLater(root.refreshList)
+            } else {
+                if (typeof ToastService !== "undefined")
+                    ToastService.showError("Scheduler", "Switch failed (exit " + code + ")")
+            }
         }
     }
 
     function refreshList() {
+        if (root.isLoading)
+            return
         root._pendingList = []
         listProcess.command = ["sh", "-c", root.schedHelper + " list"]
         listProcess.running = true
     }
 
     function switchScheduler(name, mode) {
-        if (root.isRunning) {
-            switchProcess.command = ["sh", "-c",
-                root.schedHelper + " switch " + name + " " + mode]
-        } else {
-            switchProcess.command = ["sh", "-c",
-                root.schedHelper + " start " + name + " " + mode]
-        }
+        if (root.isLoading)
+            return
+        var cmd = root.isRunning
+            ? root.schedHelper + " switch " + name + " " + mode
+            : root.schedHelper + " start " + name + " " + mode
+        switchProcess.command = ["sh", "-c", cmd]
+        switchProcess.running = true
+    }
+
+    function switchMode(modeId) {
+        if (!root.isRunning || root.isLoading)
+            return
+        switchProcess.command = ["sh", "-c", root.schedHelper + " switchmode " + modeId]
         switchProcess.running = true
     }
 
     function stopSched() {
+        if (root.isLoading)
+            return
         switchProcess.command = ["sh", "-c", root.schedHelper + " stop"]
         switchProcess.running = true
     }
 
-    Process {
-        id: switchProcess
-        running: false
-        onExited: (code, status) => {
-            if (code === 0) {
-                getProcess.command = ["sh", "-c", root.schedHelper + " current"]
-                getProcess.running = true
-                refreshList()
-            }
-        }
-    }
-
     horizontalBarPill: Component {
-        Row {
-            spacing: 4
-            StyledText {
-                text: root.isRunning
-                    ? "\u26A1" + root.currentSched.replace("scx_", "")
-                    : "\u26A1none"
-                font.pixelSize: Theme.fontSizeSmall
-                font.weight: Font.Medium
-                color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
+        MouseArea {
+            implicitWidth: contentRow.implicitWidth
+            implicitHeight: contentRow.implicitHeight
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton && root.isRunning) {
+                    root.stopSched()
+                }
             }
-            StyledText {
-                text: root.isRunning ? "[" + root.currentMode + "]" : ""
-                font.pixelSize: Theme.fontSizeSmall - 1
-                font.weight: Font.Light
-                color: Theme.primary
-                visible: root.isRunning
+
+            Row {
+                id: contentRow
+                spacing: Theme.spacingXS
+
+                DankIcon {
+                    name: root.isLoading ? "sync" : "bolt"
+                    size: Theme.iconSize - 4
+                    color: root.isRunning ? Theme.primary : Theme.surfaceVariantText
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    RotationAnimation on rotation {
+                        running: root.isLoading
+                        from: 0
+                        to: 360
+                        duration: 1000
+                        loops: Animation.Infinite
+                    }
+                }
+
+                StyledText {
+                    text: root.isRunning ? root.currentSched.replace("scx_", "") : "none"
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Medium
+                    color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                StyledText {
+                    text: root.isRunning ? "[" + root.currentMode + "]" : ""
+                    font.pixelSize: Theme.fontSizeSmall - 1
+                    font.weight: Font.Light
+                    color: Theme.primary
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: root.isRunning
+                }
             }
         }
     }
 
     verticalBarPill: Component {
-        Column {
-            spacing: 2
-            StyledText {
-                text: root.isRunning
-                    ? root.currentSched.replace("scx_", "")
-                    : "\u26A1"
-                font.pixelSize: Theme.fontSizeSmall
-                font.weight: Font.Medium
-                color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
-                anchors.horizontalCenter: parent.horizontalCenter
+        MouseArea {
+            implicitWidth: contentColumn.implicitWidth
+            implicitHeight: contentColumn.implicitHeight
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton && root.isRunning) {
+                    root.stopSched()
+                }
             }
-            StyledText {
-                text: root.isRunning ? root.currentMode : ""
-                font.pixelSize: Theme.fontSizeSmall - 2
-                font.weight: Font.Light
-                color: Theme.primary
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: root.isRunning
+
+            Column {
+                id: contentColumn
+                spacing: 2
+
+                DankIcon {
+                    name: "bolt"
+                    size: Theme.iconSize - 6
+                    color: root.isRunning ? Theme.primary : Theme.surfaceVariantText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                StyledText {
+                    text: root.isRunning ? root.currentSched.replace("scx_", "") : ""
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Medium
+                    color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: root.isRunning
+                }
+
+                StyledText {
+                    text: root.currentMode
+                    font.pixelSize: Theme.fontSizeSmall - 2
+                    font.weight: Font.Light
+                    color: Theme.primary
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: root.isRunning
+                }
             }
         }
     }
@@ -210,8 +312,8 @@ PluginComponent {
                                 required property int index
                                 required property string modelData
 
-                                width: modeLabel.implicitWidth + 12
-                                height: 26
+                                width: modeLabel.implicitWidth + 16
+                                height: 28
                                 radius: Theme.cornerRadius
                                 color: root.currentModeId === index
                                     ? Theme.primary
@@ -233,8 +335,7 @@ PluginComponent {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         if (root.currentModeId !== index) {
-                                            root.switchScheduler(root.currentSched, index)
-                                            Qt.callLater(popout.closePopout)
+                                            root.switchMode(index)
                                         }
                                     }
                                 }
@@ -257,88 +358,127 @@ PluginComponent {
                         leftPadding: Theme.spacingS
                     }
 
-                    Flickable {
+                    Item {
                         width: parent.width
                         height: 260
-                        contentHeight: Math.max(260, schedRepeater.count * 42 + 8)
                         clip: true
-                        boundsBehavior: Flickable.StopAtBounds
 
-                        Column {
-                            width: parent.width
-                            spacing: 2
-                            leftPadding: Theme.spacingS
-                            rightPadding: Theme.spacingS
+                        Flickable {
+                            id: schedFlickable
+                            anchors.fill: parent
+                            contentHeight: Math.max(260, schedRepeater.count * 42 + 8)
+                            boundsBehavior: Flickable.StopAtBounds
 
-                            Repeater {
-                                id: schedRepeater
-                                model: root.schedList
+                            ScrollBar.vertical: ScrollBar {
+                                policy: ScrollBar.AsNeeded
+                                interactive: true
+                            }
 
-                                delegate: StyledRect {
-                                    id: schedItem
-                                    required property string modelData
-                                    required property int index
+                            Column {
+                                id: schedColumn
+                                width: parent.width
+                                spacing: 2
+                                leftPadding: Theme.spacingS
+                                rightPadding: Theme.spacingS
 
-                                    property var info: root.schedDescriptions[modelData] || ["", ""]
+                                StyledText {
+                                    text: "No schedulers available"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceVariantText
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    visible: root.schedList.length === 0
+                                }
 
-                                    width: parent.width - Theme.spacingS
-                                    height: 40
-                                    radius: Theme.cornerRadius
-                                    color: root.currentSched === modelData
-                                        ? Theme.primary
-                                        : (schedMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
+                                Repeater {
+                                    id: schedRepeater
+                                    model: root.schedList
 
-                                    Row {
-                                        spacing: Theme.spacingXS
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: Theme.spacingS
-                                        anchors.verticalCenter: parent.verticalCenter
+                                    delegate: StyledRect {
+                                        id: schedItem
+                                        required property string modelData
+                                        required property int index
 
-                                        StyledText {
-                                            text: root.currentSched === modelData ? "\u25B6 " : ""
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            color: root.currentSched === modelData ? Theme.onPrimary : Theme.primary
-                                            anchors.verticalCenter: parent.verticalCenter
+                                        property var info: root.schedDescriptions[modelData] || ["", ""]
+
+                                        width: parent.width - Theme.spacingS
+                                        height: 40
+                                        radius: Theme.cornerRadius
+                                        color: root.currentSched === modelData
+                                            ? Theme.primary
+                                            : (itemMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
+
+                                        Behavior on color {
+                                            enabled: root.getAnimate()
+                                            ColorAnimation { duration: 100 }
                                         }
 
-                                        Column {
-                                            spacing: 0
+                                        Row {
+                                            spacing: Theme.spacingXS
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: Theme.spacingS
                                             anchors.verticalCenter: parent.verticalCenter
 
-                                            StyledText {
-                                                text: modelData.replace("scx_", "")
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                font.weight: root.currentSched === modelData ? Font.Bold : Font.Medium
-                                                color: root.currentSched === modelData ? Theme.onPrimary : Theme.surfaceText
+                                            DankIcon {
+                                                name: "play_arrow"
+                                                size: 14
+                                                color: root.currentSched === modelData ? Theme.onPrimary : "transparent"
+                                                anchors.verticalCenter: parent.verticalCenter
                                             }
 
-                                            StyledText {
-                                                text: schedItem.info[0]
-                                                font.pixelSize: Theme.fontSizeSmall - 2
-                                                color: root.currentSched === modelData
-                                                    ? Theme.onPrimary
-                                                    : Theme.surfaceVariantText
-                                                visible: !schedMouse.containsMouse
+                                            Column {
+                                                spacing: 0
+                                                anchors.verticalCenter: parent.verticalCenter
+
+                                                StyledText {
+                                                    text: modelData.replace("scx_", "")
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    font.weight: root.currentSched === modelData ? Font.Bold : Font.Medium
+                                                    color: root.currentSched === modelData ? Theme.onPrimary : Theme.surfaceText
+                                                }
+
+                                                StyledText {
+                                                    text: schedItem.info[0]
+                                                    font.pixelSize: Theme.fontSizeSmall - 2
+                                                    color: root.currentSched === modelData
+                                                        ? Theme.onPrimary
+                                                        : Theme.surfaceVariantText
+                                                }
                                             }
                                         }
-                                    }
 
-                                    MouseArea {
-                                        id: schedMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onEntered: popout.hoverTip = schedItem.info[1]
-                                        onExited: popout.hoverTip = ""
-                                        onClicked: {
-                                            if (root.currentSched !== modelData) {
-                                                root.switchScheduler(modelData, root.currentModeId)
-                                                Qt.callLater(popout.closePopout)
+                                        MouseArea {
+                                            id: itemMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (root.currentSched !== modelData && !root.isLoading) {
+                                                    root.switchScheduler(modelData, root.currentModeId)
+                                                    Qt.callLater(popout.closePopout)
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                        }
+
+                        MouseArea {
+                            id: hoverArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                            onPositionChanged: {
+                                var colY = schedColumn.mapFromItem(hoverArea, mouseX, mouseY).y - schedColumn.y
+                                var idx = Math.floor(colY / 42)
+                                if (idx >= 0 && idx < root.schedList.length) {
+                                    var info = root.schedDescriptions[root.schedList[idx]] || ["", ""]
+                                    popout.hoverTip = info[1]
+                                } else {
+                                    popout.hoverTip = ""
+                                }
+                            }
+                            onExited: popout.hoverTip = ""
                         }
                     }
 
@@ -348,7 +488,6 @@ PluginComponent {
                         height: 36
                         radius: Theme.cornerRadius
                         color: Theme.surfaceContainerHigh
-                        visible: true
 
                         StyledText {
                             id: tipText
@@ -370,9 +509,10 @@ PluginComponent {
                         visible: root.isRunning
 
                         DankButton {
-                            text: "Stop"
+                            text: root.isLoading ? "Working..." : "Stop"
                             iconName: "stop"
                             backgroundColor: Theme.error
+                            enabled: !root.isLoading
                             onClicked: {
                                 root.stopSched()
                                 Qt.callLater(popout.closePopout)
