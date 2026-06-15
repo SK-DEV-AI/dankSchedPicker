@@ -41,31 +41,35 @@ PluginComponent {
         "scx_rusty": [ "Feature-rich tunable", "Highly tunable scheduler with wide feature set. Good for gaming, latency-sensitive workloads, desktop, audio production, and power saving." ]
     })
 
-    function getPollInterval() {
-        var val = PluginService.getGlobalVar("dankSchedPicker", "pollInterval", 3000)
-        return Math.max(1000, Math.min(300000, val))
+    function readSetting(key, defaultVal) {
+        var v = PluginService.getGlobalVar("dankSchedPicker", key, defaultVal)
+        return v !== undefined ? v : defaultVal
     }
 
-    function getListInterval() {
-        var val = PluginService.getGlobalVar("dankSchedPicker", "listInterval", 15000)
-        return Math.max(5000, Math.min(600000, val))
+    function readPollInterval() {
+        return Math.max(1000, Math.min(300000, readSetting("pollInterval", 3000)))
     }
 
-    function getAnimate() {
-        return PluginService.getGlobalVar("dankSchedPicker", "animate", true)
+    function readListInterval() {
+        return Math.max(5000, Math.min(600000, readSetting("listInterval", 15000)))
     }
 
-    function getAutoRefresh() {
-        return PluginService.getGlobalVar("dankSchedPicker", "autoRefresh", true)
+    function readAnimate() {
+        return readSetting("animate", true)
+    }
+
+    function readAutoRefresh() {
+        return readSetting("autoRefresh", true)
     }
 
     Timer {
         id: pollTimer
-        interval: root.getPollInterval()
+        interval: 3000
         repeat: true
         running: true
         triggeredOnStart: true
         onTriggered: {
+            interval = root.readPollInterval()
             getProcess.command = ["sh", "-c", root.schedHelper + " current"]
             getProcess.running = true
         }
@@ -73,16 +77,13 @@ PluginComponent {
 
     Timer {
         id: listTimer
-        interval: root.getListInterval()
+        interval: 15000
         repeat: true
-        running: root.getAutoRefresh()
-        onTriggered: root.refreshList()
-    }
-
-    function syncTimers() {
-        pollTimer.interval = root.getPollInterval()
-        listTimer.interval = root.getListInterval()
-        listTimer.running = root.getAutoRefresh()
+        running: root.readAutoRefresh()
+        onTriggered: {
+            interval = root.readListInterval()
+            root.refreshList()
+        }
     }
 
     Component.onCompleted: {
@@ -177,34 +178,25 @@ PluginComponent {
 
     horizontalBarPill: Component {
         MouseArea {
-            implicitWidth: contentRow.implicitWidth
-            implicitHeight: contentRow.implicitHeight
+            id: pillMouse
+            implicitWidth: contentRow.implicitWidth + 6
+            implicitHeight: contentRow.implicitHeight + 4
             acceptedButtons: Qt.RightButton
             cursorShape: Qt.PointingHandCursor
 
-            onClicked: mouse => {
-                if (mouse.button === Qt.RightButton && root.isRunning) {
+            onClicked: {
+                if (root.isRunning)
                     root.stopSched()
-                }
             }
 
             Row {
                 id: contentRow
-                spacing: Theme.spacingXS
+                spacing: 2
 
                 DankIcon {
-                    name: root.isLoading ? "sync" : "bolt"
+                    name: "bolt"
                     size: Theme.iconSize - 4
                     color: root.isRunning ? Theme.primary : Theme.surfaceVariantText
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    RotationAnimation on rotation {
-                        running: root.isLoading
-                        from: 0
-                        to: 360
-                        duration: 1000
-                        loops: Animation.Infinite
-                    }
                 }
 
                 StyledText {
@@ -212,7 +204,8 @@ PluginComponent {
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.Medium
                     color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
-                    anchors.verticalCenter: parent.verticalCenter
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
                 }
 
                 StyledText {
@@ -220,7 +213,6 @@ PluginComponent {
                     font.pixelSize: Theme.fontSizeSmall - 1
                     font.weight: Font.Light
                     color: Theme.primary
-                    anchors.verticalCenter: parent.verticalCenter
                     visible: root.isRunning
                 }
             }
@@ -229,20 +221,20 @@ PluginComponent {
 
     verticalBarPill: Component {
         MouseArea {
-            implicitWidth: contentColumn.implicitWidth
-            implicitHeight: contentColumn.implicitHeight
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            implicitWidth: contentColumn.implicitWidth + 2
+            implicitHeight: contentColumn.implicitHeight + 2
+            acceptedButtons: Qt.RightButton
             cursorShape: Qt.PointingHandCursor
 
             onClicked: mouse => {
-                if (mouse.button === Qt.RightButton && root.isRunning) {
+                if (mouse.button === Qt.RightButton && root.isRunning)
                     root.stopSched()
-                }
             }
 
             Column {
                 id: contentColumn
                 spacing: 2
+                anchors.centerIn: parent
 
                 DankIcon {
                     name: "bolt"
@@ -335,9 +327,8 @@ PluginComponent {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        if (root.currentModeId !== index) {
+                                        if (root.currentModeId !== index)
                                             root.switchMode(index)
-                                        }
                                     }
                                 }
                             }
@@ -361,13 +352,13 @@ PluginComponent {
 
                     Item {
                         width: parent.width
-                        height: 260
+                        height: 200
                         clip: true
 
                         Flickable {
                             id: schedFlickable
                             anchors.fill: parent
-                            contentHeight: Math.max(260, schedRepeater.count * 42 + 8)
+                            contentHeight: Math.max(200, schedRepeater.count * 42 + 8)
                             boundsBehavior: Flickable.StopAtBounds
 
                             ScrollBar.vertical: ScrollBar {
@@ -409,7 +400,7 @@ PluginComponent {
                                             : (itemMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
 
                                         Behavior on color {
-                                            enabled: root.getAnimate()
+                                            enabled: root.readAnimate()
                                             ColorAnimation { duration: 100 }
                                         }
 
@@ -463,24 +454,6 @@ PluginComponent {
                                 }
                             }
                         }
-
-                        MouseArea {
-                            id: hoverArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.NoButton
-                            onPositionChanged: {
-                                var colY = schedColumn.mapFromItem(hoverArea, mouseX, mouseY).y - schedColumn.y
-                                var idx = Math.floor(colY / 42)
-                                if (idx >= 0 && idx < root.schedList.length) {
-                                    var info = root.schedDescriptions[root.schedList[idx]] || ["", ""]
-                                    popout.hoverTip = info[1]
-                                } else {
-                                    popout.hoverTip = ""
-                                }
-                            }
-                            onExited: popout.hoverTip = ""
-                        }
                     }
 
                     StyledRect {
@@ -526,5 +499,5 @@ PluginComponent {
     }
 
     popoutWidth: 360
-    popoutHeight: 480
+    popoutHeight: 460
 }
