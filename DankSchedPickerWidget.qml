@@ -481,7 +481,7 @@ PluginComponent {
                         height: 52
                         radius: Theme.cornerRadius
                         color: Theme.surfaceContainerHigh
-                        visible: popout.hoverTip !== ""
+                        visible: true
 
                         StyledText {
                             id: tipText
