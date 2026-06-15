@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import qs.Common
@@ -178,7 +179,6 @@ PluginComponent {
 
     horizontalBarPill: Component {
         MouseArea {
-            id: pillMouse
             implicitWidth: contentRow.implicitWidth + 6
             implicitHeight: contentRow.implicitHeight + 4
             acceptedButtons: Qt.RightButton
@@ -194,13 +194,24 @@ PluginComponent {
                 spacing: 2
 
                 DankIcon {
+                    id: pillIcon
                     name: "bolt"
                     size: Theme.iconSize - 4
                     color: root.isRunning ? Theme.primary : Theme.surfaceVariantText
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 1
+                        shadowBlur: 0.5
+                        shadowColor: Theme.shadowMedium
+                        shadowOpacity: 0.15
+                    }
                 }
 
                 StyledText {
-                    text: root.isRunning ? root.currentSched.replace("scx_", "") : "none"
+                    text: root.isRunning ? root.currentSched.replace("scx_", "") : "off"
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.Medium
                     color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
@@ -209,9 +220,9 @@ PluginComponent {
                 }
 
                 StyledText {
-                    text: root.isRunning ? "[" + root.currentMode + "]" : ""
+                    text: root.isRunning ? root.currentMode : ""
                     font.pixelSize: Theme.fontSizeSmall - 1
-                    font.weight: Font.Light
+                    font.weight: Font.Normal
                     color: Theme.primary
                     visible: root.isRunning
                 }
@@ -221,19 +232,19 @@ PluginComponent {
 
     verticalBarPill: Component {
         MouseArea {
-            implicitWidth: contentColumn.implicitWidth + 2
-            implicitHeight: contentColumn.implicitHeight + 2
+            implicitWidth: contentColumn.implicitWidth + 4
+            implicitHeight: contentColumn.implicitHeight + 4
             acceptedButtons: Qt.RightButton
             cursorShape: Qt.PointingHandCursor
 
-            onClicked: mouse => {
-                if (mouse.button === Qt.RightButton && root.isRunning)
+            onClicked: {
+                if (root.isRunning)
                     root.stopSched()
             }
 
             Column {
                 id: contentColumn
-                spacing: 2
+                spacing: 1
                 anchors.centerIn: parent
 
                 DankIcon {
@@ -245,7 +256,7 @@ PluginComponent {
 
                 StyledText {
                     text: root.isRunning ? root.currentSched.replace("scx_", "") : ""
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: Theme.fontSizeSmall - 1
                     font.weight: Font.Medium
                     color: root.isRunning ? Theme.surfaceText : Theme.surfaceVariantText
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -254,8 +265,8 @@ PluginComponent {
 
                 StyledText {
                     text: root.currentMode
-                    font.pixelSize: Theme.fontSizeSmall - 2
-                    font.weight: Font.Light
+                    font.pixelSize: Theme.fontSizeSmall - 3
+                    font.weight: Font.Normal
                     color: Theme.primary
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: root.isRunning
@@ -269,7 +280,7 @@ PluginComponent {
             id: popout
             headerText: "CPU Scheduler"
             detailsText: root.isRunning
-                ? root.currentSched + " [" + root.currentMode + "]"
+                ? root.currentSched + "  \u00B7  " + root.currentMode
                 : "No scheduler running"
             showCloseButton: true
 
@@ -284,51 +295,60 @@ PluginComponent {
                     width: parent.width
                     spacing: Theme.spacingS
 
-                    StyledText {
-                        text: "Mode:"
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceText
+                    Rectangle {
+                        width: parent.width - Theme.spacingL * 2
+                        height: 1
+                        color: Theme.withAlpha(Theme.outline, 0.12)
+                        anchors.horizontalCenter: parent.horizontalCenter
                         visible: root.isRunning
-                        leftPadding: Theme.spacingS
                     }
 
                     Flow {
                         spacing: Theme.spacingXS
                         visible: root.isRunning
-                        leftPadding: Theme.spacingS
-                        width: parent.width - Theme.spacingL
+                        leftPadding: Theme.spacingL
+                        rightPadding: Theme.spacingL
+                        width: parent.width
 
                         Repeater {
                             model: root.modeNames
-                            delegate: StyledRect {
-                                id: modeBtn
+                            delegate: Item {
                                 required property int index
                                 required property string modelData
 
-                                width: modeLabel.implicitWidth + 16
+                                width: modeLabel.implicitWidth + 20
                                 height: 28
-                                radius: Theme.cornerRadius
-                                color: root.currentModeId === index
-                                    ? Theme.primary
-                                    : (modeMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
 
-                                StyledText {
-                                    id: modeLabel
-                                    text: parent.modelData
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    font.weight: root.currentModeId === index ? Font.Bold : Font.Normal
-                                    color: root.currentModeId === index ? Theme.onPrimary : Theme.surfaceText
-                                    anchors.centerIn: parent
-                                }
-
-                                MouseArea {
-                                    id: modeMouse
+                                Rectangle {
                                     anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (root.currentModeId !== index)
-                                            root.switchMode(index)
+                                    radius: 14
+                                    color: root.currentModeId === index
+                                        ? Theme.primary
+                                        : (modeMouse.containsMouse ? Theme.surfaceContainerHighest : "transparent")
+
+                                    Behavior on color {
+                                        enabled: root.readAnimate()
+                                        ColorAnimation { duration: 120 }
+                                    }
+
+                                    StyledText {
+                                        id: modeLabel
+                                        text: parent.parent.modelData
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.weight: root.currentModeId === index ? Font.Medium : Font.Normal
+                                        color: root.currentModeId === index ? Theme.onPrimary : Theme.surfaceText
+                                        anchors.centerIn: parent
+                                    }
+
+                                    MouseArea {
+                                        id: modeMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (root.currentModeId !== index)
+                                                root.switchMode(index)
+                                        }
                                     }
                                 }
                             }
@@ -336,29 +356,30 @@ PluginComponent {
                     }
 
                     Rectangle {
-                        width: parent.width - Theme.spacingL
+                        width: parent.width - Theme.spacingL * 2
                         height: 1
-                        color: Theme.outlineVariant
+                        color: Theme.withAlpha(Theme.outline, 0.12)
                         anchors.horizontalCenter: parent.horizontalCenter
                         visible: root.isRunning
                     }
 
                     StyledText {
-                        text: "Schedulers:"
+                        text: "Schedulers"
                         font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Font.Medium
                         color: Theme.surfaceText
-                        leftPadding: Theme.spacingS
+                        leftPadding: Theme.spacingL
                     }
 
                     Item {
                         width: parent.width
-                        height: 200
+                        height: 180
                         clip: true
 
                         Flickable {
                             id: schedFlickable
                             anchors.fill: parent
-                            contentHeight: Math.max(200, schedRepeater.count * 42 + 8)
+                            contentHeight: Math.max(180, schedRepeater.count * 46)
                             boundsBehavior: Flickable.StopAtBounds
                             clip: false
 
@@ -369,10 +390,9 @@ PluginComponent {
 
                             Column {
                                 id: schedColumn
-                                width: parent.width
+                                width: parent.width - Theme.spacingM
+                                anchors.horizontalCenter: parent.horizontalCenter
                                 spacing: 2
-                                leftPadding: Theme.spacingS
-                                rightPadding: Theme.spacingS
 
                                 StyledText {
                                     text: "No schedulers available"
@@ -380,52 +400,62 @@ PluginComponent {
                                     color: Theme.surfaceVariantText
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     visible: root.schedList.length === 0
+                                    topPadding: Theme.spacingL
                                 }
 
                                 Repeater {
                                     id: schedRepeater
                                     model: root.schedList
 
-                                    delegate: StyledRect {
+                                    delegate: Rectangle {
                                         id: schedItem
                                         required property string modelData
                                         required property int index
 
                                         property var info: root.schedDescriptions[modelData] || ["", ""]
 
-                                        width: parent.width - Theme.spacingS
-                                        height: 40
+                                        width: parent.width
+                                        height: 44
                                         radius: Theme.cornerRadius
-                                        color: root.currentSched === modelData
-                                            ? Theme.primary
-                                            : (itemMouse.containsMouse ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh)
+                                        color: {
+                                            if (root.currentSched === modelData)
+                                                return Theme.primary
+                                            if (itemMouse.containsMouse)
+                                                return Theme.surfaceContainerHighest
+                                            return "transparent"
+                                        }
 
                                         Behavior on color {
                                             enabled: root.readAnimate()
                                             ColorAnimation { duration: 100 }
                                         }
 
-                                        Row {
-                                            spacing: Theme.spacingXS
+                                        Rectangle {
                                             anchors.left: parent.left
-                                            anchors.leftMargin: Theme.spacingS
+                                            anchors.top: parent.top
+                                            anchors.topMargin: 8
+                                            anchors.bottom: parent.bottom
+                                            anchors.bottomMargin: 8
+                                            width: 3
+                                            radius: 1.5
+                                            visible: root.currentSched === modelData
+                                            color: Theme.onPrimary
+                                        }
+
+                                        Row {
+                                            spacing: Theme.spacingS
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: Theme.spacingL
                                             anchors.verticalCenter: parent.verticalCenter
 
-                                            DankIcon {
-                                                name: "play_arrow"
-                                                size: 14
-                                                color: root.currentSched === modelData ? Theme.onPrimary : "transparent"
-                                                anchors.verticalCenter: parent.verticalCenter
-                                            }
-
                                             Column {
-                                                spacing: 0
+                                                spacing: 1
                                                 anchors.verticalCenter: parent.verticalCenter
 
                                                 StyledText {
                                                     text: modelData.replace("scx_", "")
                                                     font.pixelSize: Theme.fontSizeSmall
-                                                    font.weight: root.currentSched === modelData ? Font.Bold : Font.Medium
+                                                    font.weight: root.currentSched === modelData ? Font.Medium : Font.Medium
                                                     color: root.currentSched === modelData ? Theme.onPrimary : Theme.surfaceText
                                                 }
 
@@ -433,9 +463,23 @@ PluginComponent {
                                                     text: schedItem.info[0]
                                                     font.pixelSize: Theme.fontSizeSmall - 2
                                                     color: root.currentSched === modelData
-                                                        ? Theme.onPrimary
+                                                        ? Theme.withAlpha(Theme.onPrimary, 0.7)
                                                         : Theme.surfaceVariantText
                                                 }
+                                            }
+                                        }
+
+                                        Row {
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: Theme.spacingS
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: Theme.spacingXS
+                                            visible: root.currentSched === modelData
+
+                                            DankIcon {
+                                                name: "check_circle"
+                                                size: 16
+                                                color: Theme.onPrimary
                                             }
                                         }
 
@@ -463,7 +507,7 @@ PluginComponent {
                             acceptedButtons: Qt.NoButton
                             onPositionChanged: mouse => {
                                 var pt = schedColumn.mapFromItem(hoverArea, mouseX, mouseY)
-                                var idx = Math.floor(pt.y / 42)
+                                var idx = Math.floor(pt.y / 46)
                                 if (idx >= 0 && idx < root.schedList.length) {
                                     var info = root.schedDescriptions[root.schedList[idx]] || ["", ""]
                                     popout.hoverTip = info[1] || ""
@@ -478,42 +522,67 @@ PluginComponent {
                     StyledRect {
                         id: tipBar
                         width: parent.width
-                        height: 52
+                        height: 48
                         radius: Theme.cornerRadius
                         color: Theme.surfaceContainerHigh
-                        visible: true
 
                         StyledText {
                             id: tipText
                             text: popout.hoverTip
                             font.pixelSize: Theme.fontSizeSmall - 1
-                            color: Theme.surfaceText
+                            color: popout.hoverTip ? Theme.surfaceText : Theme.surfaceVariantText
                             wrapMode: Text.WordWrap
-                            width: parent.width - Theme.spacingS * 2
+                            width: parent.width - Theme.spacingL * 2
                             anchors.left: parent.left
-                            anchors.leftMargin: Theme.spacingS
+                            anchors.leftMargin: Theme.spacingL
                             anchors.verticalCenter: parent.verticalCenter
                             lineHeight: 1.3
-                            maximumLineCount: 4
+                            maximumLineCount: 3
                             clip: true
                         }
                     }
 
+                    Rectangle {
+                        width: parent.width - Theme.spacingL * 2
+                        height: 1
+                        color: Theme.withAlpha(Theme.outline, 0.12)
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: root.isRunning
+                    }
+
                     Row {
-                        spacing: Theme.spacingS
+                        spacing: Theme.spacingM
                         anchors.horizontalCenter: parent.horizontalCenter
                         visible: root.isRunning
 
                         DankButton {
-                            text: root.isLoading ? "Working..." : "Stop"
+                            text: root.isLoading ? "Switching\u2026" : "Stop"
                             iconName: "stop"
                             backgroundColor: Theme.error
+                            textColor: Theme.white
                             enabled: !root.isLoading
                             onClicked: {
                                 root.stopSched()
                                 Qt.callLater(popout.closePopout)
                             }
                         }
+
+                        DankButton {
+                            text: "Refresh"
+                            iconName: "refresh"
+                            enabled: !root.isLoading
+                            onClicked: {
+                                Qt.callLater(root.refreshList)
+                                getProcess.command = ["sh", "-c", root.schedHelper + " current"]
+                                getProcess.running = true
+                            }
+                        }
+                    }
+
+                    Item {
+                        width: 1
+                        height: Theme.spacingXS
+                        visible: root.isRunning
                     }
                 }
             }
@@ -521,5 +590,5 @@ PluginComponent {
     }
 
     popoutWidth: 360
-    popoutHeight: 460
+    popoutHeight: 480
 }
