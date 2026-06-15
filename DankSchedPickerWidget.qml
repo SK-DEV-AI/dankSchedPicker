@@ -179,7 +179,7 @@ PluginComponent {
         MouseArea {
             implicitWidth: contentRow.implicitWidth
             implicitHeight: contentRow.implicitHeight
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            acceptedButtons: Qt.RightButton
             cursorShape: Qt.PointingHandCursor
 
             onClicked: mouse => {
