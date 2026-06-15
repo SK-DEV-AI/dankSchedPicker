@@ -11,7 +11,12 @@ PluginSettings {
     sectionTitle: "Scheduler Picker"
     sectionSubtitle: "sched-ext CPU scheduler switcher"
 
-    SectionLabel { text: "Current State" }
+    StyledText {
+        text: "Current State"
+        font.pixelSize: Theme.fontSizeMedium
+        font.weight: Font.DemiBold
+        color: Theme.surfaceText
+    }
 
     StyledRect {
         width: parent.width
@@ -64,7 +69,12 @@ PluginSettings {
         }
     }
 
-    SectionLabel { text: "Configuration" }
+    StyledText {
+        text: "Configuration"
+        font.pixelSize: Theme.fontSizeMedium
+        font.weight: Font.DemiBold
+        color: Theme.surfaceText
+    }
 
     StyledRect {
         width: parent.width
@@ -187,7 +197,12 @@ PluginSettings {
         }
     }
 
-    SectionLabel { text: "About Schedulers" }
+    StyledText {
+        text: "About Schedulers"
+        font.pixelSize: Theme.fontSizeMedium
+        font.weight: Font.DemiBold
+        color: Theme.surfaceText
+    }
 
     StyledRect {
         width: parent.width
