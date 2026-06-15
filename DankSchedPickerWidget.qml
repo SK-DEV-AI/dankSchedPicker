@@ -360,6 +360,7 @@ PluginComponent {
                             anchors.fill: parent
                             contentHeight: Math.max(200, schedRepeater.count * 42 + 8)
                             boundsBehavior: Flickable.StopAtBounds
+                            clip: false
 
                             ScrollBar.vertical: ScrollBar {
                                 policy: ScrollBar.AsNeeded
@@ -453,6 +454,24 @@ PluginComponent {
                                     }
                                 }
                             }
+                        }
+
+                        MouseArea {
+                            id: hoverArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                            onPositionChanged: mouse => {
+                                var pt = schedColumn.mapFromItem(hoverArea, mouseX, mouseY)
+                                var idx = Math.floor(pt.y / 42)
+                                if (idx >= 0 && idx < root.schedList.length) {
+                                    var info = root.schedDescriptions[root.schedList[idx]] || ["", ""]
+                                    popout.hoverTip = info[1] || ""
+                                } else {
+                                    popout.hoverTip = ""
+                                }
+                            }
+                            onExited: popout.hoverTip = ""
                         }
                     }
 
