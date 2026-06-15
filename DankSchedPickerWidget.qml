@@ -199,6 +199,13 @@ PluginComponent {
                     size: Theme.iconSize - 4
                     color: root.isRunning ? Theme.primary : Theme.surfaceVariantText
 
+                    scale: root.isLoading ? 1.15 : 1
+
+                    Behavior on scale {
+                        enabled: root.readAnimate()
+                        NumberAnimation { duration: 200; easing.type: Easing.OutBack }
+                    }
+
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
@@ -278,10 +285,10 @@ PluginComponent {
     popoutContent: Component {
         PopoutComponent {
             id: popout
-            headerText: "CPU Scheduler"
+            headerText: root.isRunning ? root.currentSched : "CPU Scheduler"
             detailsText: root.isRunning
-                ? root.currentSched + "  \u00B7  " + root.currentMode
-                : "No scheduler running"
+                ? root.currentMode
+                : (root.schedList.length > 0 ? "No scheduler running" : "scx_loader unreachable \u00B7 check sched-ext")
             showCloseButton: true
 
             property string hoverTip: ""
@@ -289,6 +296,41 @@ PluginComponent {
             Item {
                 width: parent.width
                 implicitHeight: contentColumn.implicitHeight + Theme.spacingL
+
+                // Loading overlay — absolutely positioned over everything
+                Rectangle {
+                    anchors.fill: parent
+                    z: 10
+                    visible: root.isLoading
+                    color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.85)
+                    radius: Theme.cornerRadius
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: Theme.spacingS
+
+                        DankIcon {
+                            name: "refresh"
+                            size: 28
+                            color: Theme.primary
+                            anchors.horizontalCenter: parent.horizontalCenter
+
+                            NumberAnimation on rotation {
+                                from: 0; to: 360
+                                duration: 1200
+                                loops: Animation.Infinite
+                                running: root.isLoading
+                            }
+                        }
+
+                        StyledText {
+                            text: "Switching scheduler\u2026"
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceText
+                            anchors.horizontalCenter: parent.horizontalCenter
+                        }
+                    }
+                }
 
                 Column {
                     id: contentColumn
@@ -333,7 +375,7 @@ PluginComponent {
 
                                     StyledText {
                                         id: modeLabel
-                                        text: parent.parent.modelData
+                                        text: modelData
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: root.currentModeId === index ? Font.Medium : Font.Normal
                                         color: root.currentModeId === index ? Theme.onPrimary : Theme.surfaceText
@@ -394,13 +436,39 @@ PluginComponent {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 spacing: 2
 
-                                StyledText {
-                                    text: "No schedulers available"
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.surfaceVariantText
-                                    anchors.horizontalCenter: parent.horizontalCenter
+                                Column {
+                                    id: emptyStateColumn
+                                    width: parent.width
+                                    spacing: Theme.spacingXS
                                     visible: root.schedList.length === 0
-                                    topPadding: Theme.spacingL
+                                    topPadding: Theme.spacingM
+
+                                    DankIcon {
+                                        name: root.isRunning ? "inbox" : "power_off"
+                                        size: 24
+                                        color: Theme.surfaceVariantText
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+
+                                    StyledText {
+                                        text: root.isRunning ? "No schedulers available" : "scx_loader not detected"
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.weight: Font.Medium
+                                        color: Theme.surfaceText
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+
+                                    StyledText {
+                                        text: root.isRunning
+                                            ? "scx_loader D-Bus service is running but no schedulers found"
+                                            : "Install scx-scheds or check scx_loader.service"
+                                        font.pixelSize: Theme.fontSizeSmall - 1
+                                        color: Theme.surfaceVariantText
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        wrapMode: Text.WordWrap
+                                        width: parent.width - Theme.spacingXL
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
                                 }
 
                                 Repeater {
