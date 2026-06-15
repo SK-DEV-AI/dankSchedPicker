@@ -43,16 +43,16 @@ PluginComponent {
     })
 
     function readSetting(key, defaultVal) {
-        var v = PluginService.getGlobalVar("dankSchedPicker", key, defaultVal)
+        var v = PluginService.loadPluginData("dankSchedPicker", key)
         return v !== undefined ? v : defaultVal
     }
 
     function readPollInterval() {
-        return Math.max(1000, Math.min(300000, readSetting("pollInterval", 3000)))
+        return Math.max(1000, Math.min(300000, readSetting("pollInterval", 3) * 1000))
     }
 
     function readListInterval() {
-        return Math.max(5000, Math.min(600000, readSetting("listInterval", 15000)))
+        return Math.max(5000, Math.min(600000, readSetting("listInterval", 15) * 1000))
     }
 
     function readAnimate() {
