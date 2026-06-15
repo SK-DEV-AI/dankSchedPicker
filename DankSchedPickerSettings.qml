@@ -5,6 +5,7 @@ import qs.Modules.Plugins
 
 PluginSettings {
     id: settings
+    pluginId: "dankSchedPicker"
 
     sectionTitle: "Scheduler Picker"
     sectionSubtitle: "sched-ext CPU scheduler switcher"
