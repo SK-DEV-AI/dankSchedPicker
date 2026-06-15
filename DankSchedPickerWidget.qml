@@ -478,7 +478,7 @@ PluginComponent {
                     StyledRect {
                         id: tipBar
                         width: parent.width
-                        height: Math.max(32, tipText.implicitHeight + Theme.spacingM)
+                        height: 52
                         radius: Theme.cornerRadius
                         color: Theme.surfaceContainerHigh
                         visible: popout.hoverTip !== ""
@@ -492,9 +492,10 @@ PluginComponent {
                             width: parent.width - Theme.spacingS * 2
                             anchors.left: parent.left
                             anchors.leftMargin: Theme.spacingS
-                            anchors.top: parent.top
-                            anchors.topMargin: Theme.spacingXS
+                            anchors.verticalCenter: parent.verticalCenter
                             lineHeight: 1.3
+                            maximumLineCount: 4
+                            clip: true
                         }
                     }
 
