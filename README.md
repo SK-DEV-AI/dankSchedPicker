@@ -1,30 +1,35 @@
-# Scheduler Picker
+# Scheduler Picker v2
 
-A [DankMaterialShell](https://github.com/AvengeMedia/dms-plugins) bar widget for switching CPU schedulers and power profiles. Interfaces with `scx_loader` (the CachyOS sched-ext manager) via D-Bus.
+Switch CPU schedulers (sched-ext) and power profiles from the bar. Interfaces with `scx_loader` (the CachyOS sched-ext manager) via D-Bus.
 
 ![screenshot](https://raw.githubusercontent.com/SK-DEV-AI/dankSchedPicker/main/screenshot.png)
 
 ## Features
 
-- **12 schedulers** — switch between all available scx schedulers (bpfland, rusty, lavd, flow, etc.) with one click
+- **12 schedulers** — switch between all available scx schedulers (bpfland, rusty, lavd, flow, rusty, etc.) with one click
 - **5 power modes** — Auto, Gaming, PowerSave, LowLatency, Server
 - **Hover descriptions** — full scheduler information in the tooltip area
-- **Self-contained** — no external JS, all logic in QML + a helper shell script
+- **Full settings panel** — slider bars for poll/list intervals, toggles for animation and auto-refresh
+- **Popout panel** — scrollable scheduler list with active indicator, mode selector, stop and refresh controls
+- **Right-click stop** — right-click the bar pill to immediately stop the running scheduler
+- **Self-contained** — pure QML + a helper shell script, no external dependencies
 
 ## Requirements
 
 - DankMaterialShell 1.4+
 - `scx_loader` (ships with CachyOS; Arch: `scx-scheds` package)
-- D-Bus session bus (scx_loader registers on the system bus)
+- D-Bus session bus
 
 ## Installation
+
+### From DMS Plugin Registry (recommended)
 
 1. Open DMS Settings → Plugins
 2. Find **Scheduler Picker**
 3. Click Install
 4. Add the widget to your bar in DMS Bar Settings
 
-Or clone manually:
+### Manual
 
 ```sh
 mkdir -p ~/.config/DankMaterialShell/plugins
@@ -32,7 +37,7 @@ cd ~/.config/DankMaterialShell/plugins
 git clone https://github.com/SK-DEV-AI/dankSchedPicker.git
 ```
 
-Then register it in `settings.json` under `barConfigs[].rightWidgets`:
+Register in `settings.json` under `barConfigs[].rightWidgets`:
 
 ```json
 {"id": "dankSchedPicker", "enabled": true}
@@ -42,23 +47,28 @@ Restart DMS.
 
 ## Usage
 
-- **Left-click** the bolt pill → opens the scheduler picker popout
-- **Right-click** the bolt pill → stops the current scheduler
-- **Mode buttons** → switch power profile (Auto/Gaming/PowerSave/LowLatency/Server)
-- **Scheduler list** → click any to activate; the active one has a left accent bar and check mark
-- **Stop** → stops the active scheduler
-- **Refresh** → refreshes the list and current state
+| Action | Result |
+|--------|--------|
+| **Left-click** pill | Opens the scheduler picker popout |
+| **Right-click** pill | Stops the current scheduler |
+| **Mode buttons** | Switch power profile |
+| **Scheduler list** | Click any to activate (active one has left accent bar + check mark) |
+| **Stop** button | Stops the active scheduler |
+| **Refresh** button | Refreshes the list and current state |
+| **Hover** a scheduler | Shows full description in the tooltip area |
 
 ## Configuration
 
-Available in DMS Settings → Scheduler Picker:
+Open DMS Settings → Plugins → Scheduler Picker.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Poll interval | 3s | How often to check current scheduler state |
-| List refresh | 15s | How often to refresh the available scheduler list |
-| Auto-refresh | On | Automatically refresh the scheduler list |
-| Animate transitions | On | Smooth color transitions in the popout |
+| Setting | Default | Range | Description |
+|---------|---------|-------|-------------|
+| Poll Interval | 3s | 1–300 | How often to check scheduler state |
+| List Refresh | 15s | 5–600 | How often to refresh scheduler list |
+| Auto-refresh | On | — | Automatically refresh list |
+| Animate transitions | On | — | Smooth color transitions in popout |
+
+The settings panel also shows the currently active scheduler and mode.
 
 ## Roadmap
 

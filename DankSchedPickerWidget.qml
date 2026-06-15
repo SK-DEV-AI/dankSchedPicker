@@ -455,7 +455,7 @@ PluginComponent {
                                                 StyledText {
                                                     text: modelData.replace("scx_", "")
                                                     font.pixelSize: Theme.fontSizeSmall
-                                                    font.weight: root.currentSched === modelData ? Font.Medium : Font.Medium
+                                                    font.weight: root.currentSched === modelData ? Font.DemiBold : Font.Normal
                                                     color: root.currentSched === modelData ? Theme.onPrimary : Theme.surfaceText
                                                 }
 
