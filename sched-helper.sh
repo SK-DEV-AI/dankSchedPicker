@@ -64,8 +64,9 @@ case "${1:-status}" in
         ;;
     switchmode)
         mode="${2:-0}"
+        sched=$(dbus_prop CurrentScheduler | grep "string" | sed 's/.*string "\(.*\)"/\1/')
         dbus-send --system --print-reply --dest="$DBUS_DEST" "$DBUS_PATH" \
-            org.scx.Loader.SwitchScheduler string:"" uint32:"$mode" >/dev/null 2>&1
+            org.scx.Loader.SwitchScheduler string:"$sched" uint32:"$mode" >/dev/null 2>&1
         echo "$mode"
         ;;
     stop)
