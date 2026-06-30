@@ -388,8 +388,10 @@ PluginComponent {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            if (root.currentModeId !== index)
+                                            if (root.currentModeId !== index) {
                                                 root.switchMode(index)
+                                                Qt.callLater(popout.closePopout)
+                                            }
                                         }
                                     }
                                 }
